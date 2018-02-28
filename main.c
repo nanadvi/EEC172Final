@@ -95,8 +95,8 @@
 #define DATE                27    /* Current Date */
 #define MONTH               2     /* Month 1-12 */
 #define YEAR                2018  /* Current year */
-#define HOUR                11    /* Time - hours */
-#define MINUTE              27    /* Time - minutes */
+#define HOUR                19    /* Time - hours */
+#define MINUTE              32    /* Time - minutes */
 #define SECOND              0     /* Time - seconds */
 
 #define POSTHEADER "POST /things/sailesh_cc3200Board/shadow HTTP/1.1\r\n"
@@ -107,7 +107,7 @@
 #define CLHEADER1 "Content-Length: "
 #define CLHEADER2 "\r\n\r\n"
 
-#define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+#define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"orange\"\r\n}}}\r\n\r\n"
 
 // Application specific status/error codes
 typedef enum{
@@ -872,8 +872,8 @@ void main() {
     if(lRetVal < 0) {
         ERR_PRINT(lRetVal);
     }
-    http_post(lRetVal);
-//    http_get(lRetVal);
+//    http_post(lRetVal);
+    http_get(lRetVal);
 
     sl_Stop(SL_STOP_TIMEOUT);
     LOOP_FOREVER();
@@ -965,22 +965,22 @@ static int http_get(int iTLSSockID){
     pcBufHeaders += strlen(CHEADER);
     strcpy(pcBufHeaders, "\r\n\r\n");
 
-    int dataLength = strlen(DATA1);
+    // int dataLength = strlen(DATA1);
 
-    strcpy(pcBufHeaders, CTHEADER);
-    pcBufHeaders += strlen(CTHEADER);
-    strcpy(pcBufHeaders, CLHEADER1);
+    // strcpy(pcBufHeaders, CTHEADER);
+    // pcBufHeaders += strlen(CTHEADER);
+    // strcpy(pcBufHeaders, CLHEADER1);
 
-    pcBufHeaders += strlen(CLHEADER1);
-    sprintf(cCLLength, "%d", dataLength);
+    // pcBufHeaders += strlen(CLHEADER1);
+    // sprintf(cCLLength, "%d", dataLength);
 
-    strcpy(pcBufHeaders, cCLLength);
-    pcBufHeaders += strlen(cCLLength);
-    strcpy(pcBufHeaders, CLHEADER2);
-    pcBufHeaders += strlen(CLHEADER2);
+    // strcpy(pcBufHeaders, cCLLength);
+    // pcBufHeaders += strlen(cCLLength);
+    // strcpy(pcBufHeaders, CLHEADER2);
+    // pcBufHeaders += strlen(CLHEADER2);
 
-//    strcpy(pcBufHeaders, DATA1);
-//    pcBufHeaders += strlen(DATA1);
+    // strcpy(pcBufHeaders, DATA1);
+    // pcBufHeaders += strlen(DATA1);
 
     int testDataLength = strlen(pcBufHeaders);
 
@@ -990,13 +990,13 @@ static int http_get(int iTLSSockID){
     //
     // Send the packet to the server */
     //
-//    lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
-//    if(lRetVal < 0) {
-//        UART_PRINT("POST failed. Error Number: %i\n\r",lRetVal);
-//        sl_Close(iTLSSockID);
-//        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-//        return lRetVal;
-//    }
+    lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
+    if(lRetVal < 0) {
+        UART_PRINT("GET failed. Error Number: %i\n\r",lRetVal);
+        sl_Close(iTLSSockID);
+        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+        return lRetVal;
+    }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
