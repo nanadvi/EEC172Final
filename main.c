@@ -125,7 +125,10 @@
 #define CLHEADER1 "Content-Length: "
 #define CLHEADER2 "\r\n\r\n"
 
-#define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"orange\"\r\n}}}\r\n\r\n"
+#define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+
+//message + \"\r\n}}}\r\n\r\n"
+
 
 // Application specific status/error codes
 typedef enum{
@@ -202,6 +205,8 @@ int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
 };
+
+char message[100];
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
 //*****************************************************************************
@@ -216,7 +221,7 @@ static void BoardInit(void);
 static long InitializeAppVariables();
 static int tls_connect();
 static int connectToAccessPoint();
-static int http_post(int);
+static int http_post(int,char*);
 
 //*****************************************************************************
 //                      LOCAL FUNCTION DEFINITIONS
@@ -341,43 +346,6 @@ int decode(unsigned long time){
         interruptCounter = 0;
     }
     return 0;
-}
-
-void sendMessage(char message[64]) {
-    // Disable UART Interrupt while sending characters
-    MAP_UARTIntDisable(UARTA1_BASE, UART_INT_RX | UART_INT_RT);
-    int i;
-    for (i=0; i<64; i++) {
-        // Sends the character in the buffer array to the UART register
-        MAP_UARTCharPut(UARTA1_BASE, message[i]);
-        // Creates a small delay to ensure that the hardware functions correctly
-        MAP_UtilsDelay(80000);
-
-    }
-    // Enables UART interrupts
-    MAP_UARTIntEnable(UARTA1_BASE, UART_INT_RX | UART_INT_RT);
-
-}
-
-void receiveMessage() {
-    Report("H\n\r");
-    int i;
-    unsigned long ulStatus;
-    ulStatus = MAP_UARTIntStatus(UARTA1_BASE, true);
-    UARTIntClear(UARTA1_BASE, ulStatus);
-
-    MAP_UtilsDelay(80000);
-
-    for (i=0; i<8; i++) {
-        receiverBuffer[i] = MAP_UARTCharGet(UARTA1_BASE);
-        MAP_UtilsDelay(80000);
-        if (receiverBuffer[i] != ' ') {
-            drawChar(6*i, receiverLineNumber, receiverBuffer[i], WHITE, BLACK, 0x01);
-        }
-        MAP_UtilsDelay(80000);
-    }
-    receiverLineNumber += 10;
-    memset(receiverBuffer, ' ', 64);
 }
 
 void SPI_Init() {
@@ -794,7 +762,14 @@ static long ConfigureSimpleLinkToDefaultState() {
     return lRetVal; // Success
 }
 
+static void createMessage(char* b) {
+    char header[100];
+    strcpy(header, "{\"state\": {\n\r\"desired\" : {\n\r\"message\" : \"");
+    strcat(header, b);
+    strcat(header, "\"\r\n}}}\r\n\r\n");
+    strcpy(message, header);
 
+}
 //*****************************************************************************
 //
 //! Board Initialization & Configuration
@@ -1076,7 +1051,7 @@ int connectToAccessPoint() {
     return 0;
 }
 
-static int http_post(int iTLSSockID){
+static int http_post(int iTLSSockID, char* m){
     char acSendBuff[512];
     char acRecvbuff[1460];
     char cCLLength[200];
@@ -1092,7 +1067,16 @@ static int http_post(int iTLSSockID){
     pcBufHeaders += strlen(CHEADER);
     strcpy(pcBufHeaders, "\r\n\r\n");
 
-    int dataLength = strlen(DATA1);
+
+    char DATA[100];
+
+    strcpy(message, "{\"state\": {\n\r\"desired\" : {\n\r\"message\" : \"");
+    strcat(message, m);
+    strcat(message, "\"\r\n}}}\r\n\r\n");
+
+    strcpy(DATA, message);
+
+    int dataLength = strlen(DATA);
 
     strcpy(pcBufHeaders, CTHEADER);
     pcBufHeaders += strlen(CTHEADER);
@@ -1106,8 +1090,8 @@ static int http_post(int iTLSSockID){
     strcpy(pcBufHeaders, CLHEADER2);
     pcBufHeaders += strlen(CLHEADER2);
 
-    strcpy(pcBufHeaders, DATA1);
-    pcBufHeaders += strlen(DATA1);
+    strcpy(pcBufHeaders, DATA);
+    pcBufHeaders += strlen(DATA);
 
     int testDataLength = strlen(pcBufHeaders);
 
@@ -1274,7 +1258,8 @@ void main() {
                    printBuffer();
                    memset(buffer, ' ', 64);
                    readIndex = 0;
-                   // Send message to the other board
+
+                   http_post(lRetVal, buffer);
                }
                else if (currRead == 'F' && _readTime > 2000) {
                    ;
