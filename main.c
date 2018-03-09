@@ -82,6 +82,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
+#include <math.h>
 //Common interface includes
 #include "uart_if.h"
 #include "timer_if.h"
@@ -108,6 +109,7 @@
 #define SL_SSL_CA_CERT "/cert/rootCA.der"
 #define SL_SSL_PRIVATE "/cert/private.der"
 #define SL_SSL_CLIENT  "/cert/client.der"
+
 
 //NEED TO UPDATE THIS FOR IT TO WORK!
 #define DATE                1    /* Current Date */
@@ -203,21 +205,32 @@ int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,0}, // 8
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,0,1,1,1,1,0}, // 9
                        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
+                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0}  // MUTE
 };
 
 char message[100];
 // Grid of the table
-int board[128][128] = {{0}};
+int board[WIDTH][HEIGHT] = {{0}};
 
 typedef struct Pong
 {
     float x;
     float y;
-    float angle;
-    float velocity;
+    float r;
+    double angle;
+    double velocityX;
+    double velocityY;
 }Pong;
 
+typedef struct Pedal
+{
+    float position;
+    int health;
+}Pedal;
+// Ball starts from the middle of the board
+static Pong pong = { .x = WIDTH/2, .y = HEIGHT/2, .r = 5, .angle = 45, .velocityX = 2 , .velocityY = 2};
+static Pedal player1 = { .position = WIDTH/2, .health = 3 };
+static Pedal player2 = { .position = WIDTH/2, .health = 3 };
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
@@ -1361,6 +1374,36 @@ void GetMessage()
     }
 }
 
+void GameLogic()
+{
+    // Basic Draw the PONG
+    float currX = pong.x, currY = pong.y;
+    fillCircle(currX, currY, pong.r, BLACK);
+
+    if((pong.x - pong.r) < 0)
+    {
+        pong.velocityX *= -1;
+        pong.x = pong.r;
+    }
+    else if( pong.x + pong.r > WIDTH)
+    {
+        pong.velocityX *= -1;
+        pong.x = WIDTH - pong.r;
+    }
+    if((pong.y - pong.r) < 0)
+    {
+        pong.velocityY *= -1;
+        pong.x = pong.r;
+    }
+    else if( pong.y + pong.r > HEIGHT)
+    {
+        pong.velocityY *= -1;
+        pong.x = HEIGHT - pong.r;
+    }
+    pong.x += (cos(pong.angle) * pong.velocityX);
+    pong.y += (sin(pong.angle) * pong.velocityY);
+    fillCircle(pong.x, pong.y, pong.r, BLUE);
+}
 //*****************************************************************************
 //
 //! Main
@@ -1384,7 +1427,7 @@ void main() {
     ClearTerm();
 
     displayBanner();
-
+    /*
     //Connect the CC3200 to the local access point
     lRetVal = connectToAccessPoint();
     //Set time so that encryption can be used
@@ -1398,6 +1441,7 @@ void main() {
     if(lRetVal < 0) {
         ERR_PRINT(lRetVal);
     }
+    */
     // SPI config
     SPI_Init();
 
@@ -1426,12 +1470,13 @@ void main() {
     TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
     deleteFlag = 0;
     while (1) {
-           // logic for matching the pattern and displaying character on OLED
-           // 35 RISING HIGH INTERRUPTS
-        GetMessage();
-       }
+        // logic for matching the pattern and displaying character on OLED
+        // 35 RISING HIGH INTERRUPTS
+        // GetMessage();
+        GameLogic();
+
+    }
     sl_Stop(SL_STOP_TIMEOUT);
-//    LOOP_FOREVER();
 }
 //*****************************************************************************
 //
