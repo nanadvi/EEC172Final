@@ -207,6 +207,18 @@ int buttons[12][35] = {
 };
 
 char message[100];
+// Grid of the table
+int board[128][128] = {{0}};
+
+typedef struct Pong
+{
+    float x;
+    float y;
+    float angle;
+    float velocity;
+}Pong;
+
+
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
 //*****************************************************************************
@@ -658,9 +670,9 @@ static long ConfigureSimpleLinkToDefaultState() {
             // If the device is in AP mode, we need to wait for this event 
             // before doing anything 
             while(!IS_IP_ACQUIRED(g_ulStatus)) {
-#ifndef SL_PLATFORM_MULTI_THREADED
-              _SlNonOsMainLoopTask(); 
-#endif
+                #ifndef SL_PLATFORM_MULTI_THREADED
+                _SlNonOsMainLoopTask();
+                #endif
             }
         }
 
@@ -780,18 +792,18 @@ static void createMessage(char* b) {
 //
 //*****************************************************************************
 static void BoardInit(void) {
-/* In case of TI-RTOS vector table is initialize by OS itself */
-#ifndef USE_TIRTOS
-  //
-  // Set vector table base
-  //
-#if defined(ccs)
+    /* In case of TI-RTOS vector table is initialize by OS itself */
+    #ifndef USE_TIRTOS
+    //
+    // Set vector table base
+    //
+    #if defined(ccs)
     MAP_IntVTableBaseSet((unsigned long)&g_pfnVectors[0]);
-#endif
-#if defined(ewarm)
+    #endif
+    #if defined(ewarm)
     MAP_IntVTableBaseSet((unsigned long)&__vector_table);
-#endif
-#endif
+    #endif
+    #endif
     //
     // Enable Processor
     //
@@ -1069,14 +1081,19 @@ static int http_post(int iTLSSockID, char* m){
 
 
     char DATA[100];
+    memset(DATA, ' ', 100);
 
-    strcpy(message, "{\"state\": {\n\r\"desired\" : {\n\r\"message\" : \"");
-    strcat(message, m);
+    int msgLength = (int)strlen(m);
+    strcpy(message, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
+    strncat(message, m, msgLength);
     strcat(message, "\"\r\n}}}\r\n\r\n");
 
     strcpy(DATA, message);
+    msgLength = strlen(message);
+    DATA[msgLength+1] = '\0';
 
     int dataLength = strlen(DATA);
+
 
     strcpy(pcBufHeaders, CTHEADER);
     pcBufHeaders += strlen(CTHEADER);
@@ -1179,6 +1196,171 @@ void displayBanner()
     Message("\n\n\n\r");
 }
 
+void GetMessage()
+{
+    // logic for matching the pattern and displaying character on OLED
+    // 35 RISING HIGH INTERRUPTS
+    if (interruptCounter == 35)
+    {
+        MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
+        currRead = compareBitPatterns();
+        if (currRead == 'M')
+        {
+            Report("\n\r");
+            printBuffer();
+            buffer[readIndex + 1] = '\0';
+            // http_post(lRetVal, buffer);
+            memset(buffer, ' ', 64);
+            readIndex = 0;
+        }
+        else if (currRead == 'F' && _readTime > 2000)
+        {
+            ;
+        }
+        else if (currRead != 'F' && _readTime > 2000)
+        {
+            char output = ' ';
+            switch (currRead)
+            {
+            case '2':
+                output = 'a';
+                break;
+            case '3':
+                output = 'd';
+                break;
+            case '4':
+                output = 'g';
+                break;
+            case '5':
+                output = 'j';
+                break;
+            case '6':
+                output = 'm';
+                break;
+            case '7':
+                output = 'p';
+                break;
+            case '8':
+                output = 't';
+                break;
+            case '9':
+                output = 'w';
+                break;
+            case '0':
+                output = ' ';
+                break;
+            case 'D':
+                deleteFlag = 1;
+                break;
+            }
+            buffer[readIndex] = output;
+            Report("%c", buffer[readIndex]);
+            if (deleteFlag == 0)
+                readIndex++;
+        }
+        else if (currRead == 'F' && _readTime < 2700)
+        {
+            char output = ' ';
+            switch (buffer[readIndex - 1])
+            {
+            case 'a':
+                output = 'b';
+                break;
+            case 'b':
+                output = 'c';
+                break;
+            case 'c':
+                output = 'a';
+                break;
+            case 'd':
+                output = 'e';
+                break;
+            case 'e':
+                output = 'f';
+                break;
+            case 'f':
+                output = 'd';
+                break;
+            case 'g':
+                output = 'h';
+                break;
+            case 'h':
+                output = 'i';
+                break;
+            case 'i':
+                output = 'g';
+                break;
+            case 'j':
+                output = 'k';
+                break;
+            case 'k':
+                output = 'l';
+                break;
+            case 'l':
+                output = 'j';
+                break;
+            case 'm':
+                output = 'n';
+                break;
+            case 'n':
+                output = 'o';
+                break;
+            case 'o':
+                output = 'm';
+                break;
+            case 'p':
+                output = 'q';
+                break;
+            case 'q':
+                output = 'r';
+                break;
+            case 'r':
+                output = 's';
+                break;
+            case 's':
+                output = 'p';
+                break;
+            case 't':
+                output = 'u';
+                break;
+            case 'u':
+                output = 'v';
+                break;
+            case 'w':
+                output = 'x';
+                break;
+            case 'x':
+                output = 'y';
+                break;
+            case 'y':
+                output = 'z';
+                break;
+            case 'z':
+                output = 'w';
+                break;
+            }
+            buffer[readIndex - 1] = output;
+            Report("%c", buffer[readIndex - 1]);
+        }
+
+        if ((currRead == 'D' || deleteFlag == 1) && readIndex > 0)
+        {
+            // Pressing the delete button
+            Report("D");
+            Report("%d", readIndex);
+            buffer[readIndex] = ' ';
+            readIndex--;
+            deleteFlag = 0;
+        }
+        // replace above line with code to print to OLED
+        _readTime = 0;
+        interruptCounter = 0;
+        initializeArr();
+        MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
+        TimerEnable(TIMERA0_BASE, TIMER_A);
+    }
+}
+
 //*****************************************************************************
 //
 //! Main
@@ -1246,199 +1428,7 @@ void main() {
     while (1) {
            // logic for matching the pattern and displaying character on OLED
            // 35 RISING HIGH INTERRUPTS
-           if(interruptCounter == 35)
-           {
-               MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
-
-               currRead =  compareBitPatterns();
-
-               if(currRead == 'M')
-               {
-                   Report("\n\r");
-                   printBuffer();
-                   memset(buffer, ' ', 64);
-                   readIndex = 0;
-
-                   http_post(lRetVal, buffer);
-               }
-               else if (currRead == 'F' && _readTime > 2000) {
-                   ;
-               }
-               else if (currRead != 'F' && _readTime > 2000) {
-                   char output = ' ';
-                   switch(currRead) {
-                   case '2':
-                       output = 'a';
-                       break;
-
-                   case '3':
-                       output = 'd';
-                       break;
-
-                   case '4':
-                       output = 'g';
-                       break;
-
-                   case '5':
-                       output = 'j';
-                       break;
-
-                   case '6':
-                       output = 'm';
-                       break;
-
-                   case '7':
-                       output = 'p';
-                       break;
-
-                   case '8':
-                       output = 't';
-                       break;
-
-                   case '9':
-                       output = 'w';
-                       break;
-
-                   case '0':
-                       output = ' ';
-                       break;
-                   case 'D':
-                       deleteFlag = 1;
-                       break;
-                   }
-                   buffer[readIndex] = output;
-                   Report("%c", buffer[readIndex]);
-                   drawChar(6*readIndex, 0, buffer[readIndex], WHITE, BLACK, 0x01);
-                   if (deleteFlag == 0)
-                       readIndex++;
-               }
-               else if (currRead == 'F' && _readTime < 2700) {
-                   char output = ' ';
-                   switch(buffer[readIndex-1]) {
-                   case 'a':
-                       output = 'b';
-                       break;
-
-                   case 'b':
-                       output = 'c';
-                       break;
-
-                   case 'c':
-                       output = 'a';
-                       break;
-
-                   case 'd':
-                       output = 'e';
-                       break;
-
-                   case 'e':
-                       output = 'f';
-                       break;
-
-                   case 'f':
-                       output = 'd';
-                       break;
-
-                   case 'g':
-                       output = 'h';
-                       break;
-
-                   case 'h':
-                       output = 'i';
-                       break;
-
-                   case 'i':
-                       output = 'g';
-                       break;
-
-                   case 'j':
-                       output = 'k';
-                       break;
-
-                   case 'k':
-                       output = 'l';
-                       break;
-
-                   case 'l':
-                       output = 'j';
-                       break;
-
-                   case 'm':
-                       output = 'n';
-                       break;
-
-                   case 'n':
-                       output = 'o';
-                       break;
-
-                   case 'o':
-                       output = 'm';
-                       break;
-
-                   case 'p':
-                       output = 'q';
-                       break;
-
-                   case 'q':
-                       output = 'r';
-                       break;
-
-                   case 'r':
-                       output = 's';
-                       break;
-
-                   case 's':
-                       output = 'p';
-                       break;
-
-                   case 't':
-                       output = 'u';
-                       break;
-
-                   case 'u':
-                       output = 'v';
-                       break;
-
-                   case 'w':
-                       output = 'x';
-                       break;
-
-                   case 'x':
-                       output = 'y';
-                       break;
-
-                   case 'y':
-                       output = 'z';
-                       break;
-
-                   case 'z':
-                       output = 'w';
-                       break;
-                   }
-                   buffer[readIndex-1] = output;
-                   Report("%c", buffer[readIndex-1]);
-                   drawChar(6*(readIndex-1), 0, buffer[readIndex-1], WHITE, BLACK, 0x01);
-               }
-               if((currRead == 'D' || deleteFlag == 1) && readIndex > 0)
-               {
-                   // Pressing the delete button
-                   Report("D");
-                   Report("%d", readIndex);
-                   buffer[readIndex] = ' ';
-                   readIndex--;
-                   drawChar(6*readIndex, 0, ' ', WHITE, BLACK, 0x01);
-                   deleteFlag = 0;
-
-               }
-
-               // replace above line with code to print to OLED
-                _readTime = 0;
-
-               interruptCounter = 0;
-               initializeArr();
-               MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
-               TimerEnable(TIMERA0_BASE, TIMER_A);
-           }
+        GetMessage();
        }
     sl_Stop(SL_STOP_TIMEOUT);
 //    LOOP_FOREVER();
