@@ -155,10 +155,11 @@ typedef struct
    unsigned long reserved[3];
 }SlDateTime;
 
-typedef struct PinSetting {
+typedef struct {
     unsigned long port;
     unsigned int pin;
 } PinSetting;
+
 static PinSetting gpioin = { .port = GPIOA0_BASE, .pin = 0x40 };
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -179,46 +180,40 @@ extern uVectorEntry __vector_table;
 
 volatile unsigned long time;
 int interruptCounter;
-int pulseCounter;
-int deleteFlag;
-char prevRead, currRead;
-char buffer[64];
-char receiverBuffer[64];
 unsigned long _time;
-unsigned long _readTime;
-unsigned long timeInterval[35] = {};
-unsigned long timeOfInterrupt[35] = {};
 unsigned int bitSequence[35] = {};
-int receiverLineNumber;
-int readIndex;
 int buttons[12][35] = {
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0}, // 3
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,1,0}, // 4
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,0}, // 5
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,1,0}, // 6
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,1,0,0,0,0,1,1,1,0,1,1,1,1,0}, // 7
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,0}, // 8
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,0,1,1,1,1,0}, // 9
-                       {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0}, // 3
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,1,0}, // 4
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,0}, // 5
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,1,0}, // 6
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,1,0,0,0,0,1,1,1,0,1,1,1,1,0}, // 7
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,0}, // 8
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,0,1,1,1,1,0}, // 9
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
+  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
 };
 
-char message[100];
 // Grid of the table
 int board[128][128] = {{0}};
 
-typedef struct Pong
-{
+typedef struct {
     float x;
     float y;
     float angle;
     float velocity;
 }Pong;
 
+typedef struct {
+    float y;
+    float width;
+    float height;
+}Paddle;
 
+static Paddle paddle1 = {.y = 64, .width = 3, .height = 7};
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
 //*****************************************************************************
@@ -248,7 +243,6 @@ void TimerRefIntHandler(void)
     ulInts = TimerIntStatus(TIMERA0_BASE, true);
     TimerIntClear(TIMERA0_BASE, ulInts);
     _time++;
-    _readTime++;
 }
 
 int compareTwoSequence(int sequence1[35], int sequence2[35]) {
@@ -287,22 +281,16 @@ static void GPIOA2IntHandler(void)
     if(interruptCounter < 35)
     {
         bitSequence[interruptCounter] = decode(time);
-        timeOfInterrupt[interruptCounter] = time;
         interruptCounter++;
     }
     if(interruptCounter == 35)
     {
-        // GPIOIntDisable(gpioin.port, gpioin.pin);
         // Don't tick till we read and decode the bits
         TimerDisable(TIMERA0_BASE, TIMER_A);
-        // Stop taking ticks too
-        // interruptCounter = 0;
-        // initializeArr();
-        // GPIOIntEnable(gpioin.port, gpioin.pin);
     }
 }
 
-void timerInit()
+void TimerInit()
 {
     Timer_IF_Init(PRCM_TIMERA0, TIMERA0_BASE, TIMER_CFG_PERIODIC, TIMER_A, 255);
     Timer_IF_IntSetup(TIMERA0_BASE, TIMER_A, TimerRefIntHandler);
@@ -315,8 +303,6 @@ void initializeArr()
     int i;
     for(i = 0; i < 35; i++)
     {
-        timeInterval[i] = 0;
-        timeOfInterrupt[i] = 0;
         bitSequence[i] = 0;
     }
 }
@@ -324,25 +310,7 @@ void initializeArr()
 void initializeVariables()
 {
     interruptCounter = 0;
-    pulseCounter = 0;
     _time = 0;
-    readIndex = 0;
-    receiverLineNumber = 64;
-    memset(buffer, ' ', 64);
-    memset(receiverBuffer, ' ', 64);
-    int fPressed = 0;
-}
-
-void printBuffer()
-{
-    int i;
-    for(i = 0; i < readIndex; i++)
-    {
-        Report("%c", buffer[i]);
-        drawChar(6*i, 30, buffer[i], WHITE, BLACK, 0x01);
-    }
-    Report("\n\r");
-
 }
 
 int decode(unsigned long time){
@@ -1188,177 +1156,20 @@ static int http_get(int iTLSSockID){
     return 0;
 }
 
-void displayBanner()
+void DisplayBanner()
 {
     Message("\t\t****************************************************\n\r");
-    Message("\t\t\                      LAB 3                        \n\r");
+    Message("\t\t                       LAB 6                       \n\r");
     Message("\t\t****************************************************\n\r");
     Message("\n\n\n\r");
 }
 
 void GetMessage()
 {
-    // logic for matching the pattern and displaying character on OLED
-    // 35 RISING HIGH INTERRUPTS
-    if (interruptCounter == 35)
-    {
-        MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
-        currRead = compareBitPatterns();
-        if (currRead == 'M')
-        {
-            Report("\n\r");
-            printBuffer();
-            buffer[readIndex + 1] = '\0';
-            // http_post(lRetVal, buffer);
-            memset(buffer, ' ', 64);
-            readIndex = 0;
-        }
-        else if (currRead == 'F' && _readTime > 2000)
-        {
-            ;
-        }
-        else if (currRead != 'F' && _readTime > 2000)
-        {
-            char output = ' ';
-            switch (currRead)
-            {
-            case '2':
-                output = 'a';
-                break;
-            case '3':
-                output = 'd';
-                break;
-            case '4':
-                output = 'g';
-                break;
-            case '5':
-                output = 'j';
-                break;
-            case '6':
-                output = 'm';
-                break;
-            case '7':
-                output = 'p';
-                break;
-            case '8':
-                output = 't';
-                break;
-            case '9':
-                output = 'w';
-                break;
-            case '0':
-                output = ' ';
-                break;
-            case 'D':
-                deleteFlag = 1;
-                break;
-            }
-            buffer[readIndex] = output;
-            Report("%c", buffer[readIndex]);
-            if (deleteFlag == 0)
-                readIndex++;
-        }
-        else if (currRead == 'F' && _readTime < 2700)
-        {
-            char output = ' ';
-            switch (buffer[readIndex - 1])
-            {
-            case 'a':
-                output = 'b';
-                break;
-            case 'b':
-                output = 'c';
-                break;
-            case 'c':
-                output = 'a';
-                break;
-            case 'd':
-                output = 'e';
-                break;
-            case 'e':
-                output = 'f';
-                break;
-            case 'f':
-                output = 'd';
-                break;
-            case 'g':
-                output = 'h';
-                break;
-            case 'h':
-                output = 'i';
-                break;
-            case 'i':
-                output = 'g';
-                break;
-            case 'j':
-                output = 'k';
-                break;
-            case 'k':
-                output = 'l';
-                break;
-            case 'l':
-                output = 'j';
-                break;
-            case 'm':
-                output = 'n';
-                break;
-            case 'n':
-                output = 'o';
-                break;
-            case 'o':
-                output = 'm';
-                break;
-            case 'p':
-                output = 'q';
-                break;
-            case 'q':
-                output = 'r';
-                break;
-            case 'r':
-                output = 's';
-                break;
-            case 's':
-                output = 'p';
-                break;
-            case 't':
-                output = 'u';
-                break;
-            case 'u':
-                output = 'v';
-                break;
-            case 'w':
-                output = 'x';
-                break;
-            case 'x':
-                output = 'y';
-                break;
-            case 'y':
-                output = 'z';
-                break;
-            case 'z':
-                output = 'w';
-                break;
-            }
-            buffer[readIndex - 1] = output;
-            Report("%c", buffer[readIndex - 1]);
-        }
-
-        if ((currRead == 'D' || deleteFlag == 1) && readIndex > 0)
-        {
-            // Pressing the delete button
-            Report("D");
-            Report("%d", readIndex);
-            buffer[readIndex] = ' ';
-            readIndex--;
-            deleteFlag = 0;
-        }
-        // replace above line with code to print to OLED
-        _readTime = 0;
         interruptCounter = 0;
         initializeArr();
         MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
         TimerEnable(TIMERA0_BASE, TIMER_A);
-    }
 }
 
 //*****************************************************************************
@@ -1371,19 +1182,31 @@ void GetMessage()
 //!
 //*****************************************************************************
 void main() {
+    // status variables for network connections
     unsigned long ulStatus;
     long lRetVal = -1;
+
     //
     // Initialize board configuration
     //
     BoardInit();
 
+    //
+    // Initialize pin mux configuration
+    //
     PinMuxConfig();
 
+    // 
+    // Initialize terminal
+    //
     InitTerm();
+    // clear contents on terminal
     ClearTerm();
 
-    displayBanner();
+    // 
+    // Display opening banner
+    //
+    DisplayBanner();
 
     //Connect the CC3200 to the local access point
     lRetVal = connectToAccessPoint();
@@ -1398,6 +1221,7 @@ void main() {
     if(lRetVal < 0) {
         ERR_PRINT(lRetVal);
     }
+
     // SPI config
     SPI_Init();
 
@@ -1406,7 +1230,8 @@ void main() {
 
     fillScreen(BLACK);
 
-    timerInit();
+    TimerInit();
+
     // Register the interrupt handlers
     MAP_GPIOIntRegister(gpioin.port, GPIOA2IntHandler);
     //
@@ -1417,7 +1242,7 @@ void main() {
     MAP_GPIOIntClear(gpioin.port, ulStatus);            // clear interrupts on GPIOA2
 
     // Initialize all the global variables
-    initializeVariables();
+    initializeVariables()
     initializeArr();
 
     MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
@@ -1429,7 +1254,11 @@ void main() {
            // logic for matching the pattern and displaying character on OLED
            // 35 RISING HIGH INTERRUPTS
         GetMessage();
-       }
+        interruptCounter = 0;
+        initializeArr();
+        MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
+        TimerEnable(TIMERA0_BASE, TIMER_A);
+    }
     sl_Stop(SL_STOP_TIMEOUT);
 //    LOOP_FOREVER();
 }
