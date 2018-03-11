@@ -196,6 +196,7 @@ int buttons[12][35] = {
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
   {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
 };
+char currRead;
 
 // Grid of the table
 int board[128][128] = {{0}};
@@ -214,6 +215,7 @@ typedef struct {
 }Paddle;
 
 static Paddle paddle1 = {.y = 64, .width = 3, .height = 7};
+static Paddle paddle2 = {.y = 64, .width = 3, .height = 7};
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
 //*****************************************************************************
@@ -747,7 +749,6 @@ static void createMessage(char* b) {
     strcpy(header, "{\"state\": {\n\r\"desired\" : {\n\r\"message\" : \"");
     strcat(header, b);
     strcat(header, "\"\r\n}}}\r\n\r\n");
-    strcpy(message, header);
 
 }
 //*****************************************************************************
@@ -793,7 +794,7 @@ static void BoardInit(void) {
 //!
 //! \return  0 on success else error code
 //!
-//! \warning    If the WLAN connection fails or we don't aquire an IP
+//! \warning    If the WLAN connection fails or we don't acquire an IP
 //!            address, It will be stuck in this function forever.
 //
 //****************************************************************************
@@ -1027,7 +1028,7 @@ int connectToAccessPoint() {
         return lRetVal;
     }
 
-    UART_PRINT("Connection established w/ AP and IP is aquired \n\r");
+    UART_PRINT("Connection established w/ AP and IP is acquired \n\r");
     return 0;
 }
 
@@ -1052,12 +1053,11 @@ static int http_post(int iTLSSockID, char* m){
     memset(DATA, ' ', 100);
 
     int msgLength = (int)strlen(m);
-    strcpy(message, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
-    strncat(message, m, msgLength);
-    strcat(message, "\"\r\n}}}\r\n\r\n");
+    strcpy(DATA, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
+    strncat(DATA, m, msgLength);
+    strcat(DATA, "\"\r\n}}}\r\n\r\n");
 
-    strcpy(DATA, message);
-    msgLength = strlen(message);
+    msgLength = strlen(DATA);
     DATA[msgLength+1] = '\0';
 
     int dataLength = strlen(DATA);
@@ -1196,14 +1196,14 @@ void main() {
     //
     PinMuxConfig();
 
-    // 
+    //
     // Initialize terminal
     //
     InitTerm();
     // clear contents on terminal
     ClearTerm();
 
-    // 
+    //
     // Display opening banner
     //
     DisplayBanner();
@@ -1242,25 +1242,38 @@ void main() {
     MAP_GPIOIntClear(gpioin.port, ulStatus);            // clear interrupts on GPIOA2
 
     // Initialize all the global variables
-    initializeVariables()
+    initializeVariables();
     initializeArr();
 
     MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
 
     // setting timer value to 0
     TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
-    deleteFlag = 0;
+
+    // TODO: display starting state of board
+
     while (1) {
-           // logic for matching the pattern and displaying character on OLED
-           // 35 RISING HIGH INTERRUPTS
-        GetMessage();
-        interruptCounter = 0;
-        initializeArr();
-        MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
-        TimerEnable(TIMERA0_BASE, TIMER_A);
+        if (interruptCounter == 35) {
+            MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
+            currRead = compareBitPatterns();
+
+            // TODO: moving the paddle up
+            if (currRead == '2') {
+
+            }
+            // TODO: moving the paddle down
+            else if (currRead == '8') {
+
+            }
+
+            interruptCounter = 0;
+            initializeArr();
+            MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
+            TimerEnable(TIMERA0_BASE, TIMER_A);
+        }
+
     }
     sl_Stop(SL_STOP_TIMEOUT);
-//    LOOP_FOREVER();
 }
 //*****************************************************************************
 //
@@ -1268,4 +1281,3 @@ void main() {
 //! @}
 //
 //*****************************************************************************
-
