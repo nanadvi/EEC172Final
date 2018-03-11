@@ -193,6 +193,8 @@ unsigned long timeOfInterrupt[35] = {};
 unsigned int bitSequence[35] = {};
 int receiverLineNumber;
 int readIndex;
+int pedalSize = 20;
+int pedalWidth = 5;
 int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
@@ -1404,6 +1406,13 @@ void GameLogic()
     pong.y += (sin(pong.angle) * pong.velocityY);
     fillCircle(pong.x, pong.y, pong.r, BLUE);
 }
+
+void PedalLogic()
+{
+    fillRect(player1.position-pedalSize, 0, pedalSize, 5, GREEN);
+    fillRect(player2.position-pedalSize, HEIGHT-pedalWidth, pedalSize, pedalWidth, BLUE);
+
+}
 //*****************************************************************************
 //
 //! Main
@@ -1413,7 +1422,7 @@ void GameLogic()
 //! \return None
 //!
 //*****************************************************************************
-void main() {
+  void main() {
     unsigned long ulStatus;
     long lRetVal = -1;
     //
@@ -1473,7 +1482,8 @@ void main() {
         // logic for matching the pattern and displaying character on OLED
         // 35 RISING HIGH INTERRUPTS
         // GetMessage();
-        GameLogic();
+        // GameLogic();
+        PedalLogic();
 
     }
     sl_Stop(SL_STOP_TIMEOUT);
