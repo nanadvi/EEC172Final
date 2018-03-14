@@ -1,67 +1,5 @@
-//*****************************************************************************
-//
-// Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/ 
-// 
-// 
-//  Redistribution and use in source and binary forms, with or without 
-//  modification, are permitted provided that the following conditions 
-//  are met:
-//
-//    Redistributions of source code must retain the above copyright 
-//    notice, this list of conditions and the following disclaimer.
-//
-//    Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the 
-//    documentation and/or other materials provided with the   
-//    distribution.
-//
-//    Neither the name of Texas Instruments Incorporated nor the names of
-//    its contributors may be used to endorse or promote products derived
-//    from this software without specific prior written permission.
-//
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
-//  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
-//  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-//  A PARTICULAR PURPOSE ARE DISCLAIMED. DFONG_BREADCRUMB: W18
-//  IN NO EVENT SHALL THE COPYRIGHT
-//  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
-//  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT 
-//  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-//  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
-//  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
-//  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-//*****************************************************************************
-
-
-//*****************************************************************************
-//
-// Application Name     -   SSL Demo
-// Application Overview -   This is a sample application demonstrating the
-//                          use of secure sockets on a CC3200 device.The
-//                          application connects to an AP and
-//                          tries to establish a secure connection to the
-//                          Google server.
-// Application Details  -
-// docs\examples\CC32xx_SSL_Demo_Application.pdf
-// or
-// http://processors.wiki.ti.com/index.php/CC32xx_SSL_Demo_Application
-//
-//*****************************************************************************
-
-
-//*****************************************************************************
-//
-//! \addtogroup ssl
-//! @{
-//
-//*****************************************************************************
-
 // Simplelink includes
 #include "simplelink.h"
-
 //Driverlib includes
 #include "hw_types.h"
 #include "hw_ints.h"
@@ -96,6 +34,7 @@
 #include "glcdfont.h"
 // draw functions includes
 #include "test.h"
+
 #define SPI_IF_BIT_RATE  100000
 #define TR_BUFF_SIZE 100
 // Definitions for Simplelink
@@ -128,9 +67,6 @@
 #define CLHEADER2 "\r\n\r\n"
 
 #define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
-
-//message + \"\r\n}}}\r\n\r\n"
-
 
 // Application specific status/error codes
 typedef enum{
@@ -183,6 +119,7 @@ volatile unsigned long time;
 int interruptCounter;
 int pulseCounter;
 int deleteFlag;
+char lastRead;
 char prevRead, currRead;
 char buffer[64];
 char receiverBuffer[64];
@@ -199,21 +136,27 @@ int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0}, // 3
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,1,0}, // 4
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,0}, // 5
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,1,0}, // 6
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,1,0,0,0,0,1,1,1,0,1,1,1,1,0}, // 7
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,0}, // 8
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,0,1,1,1,1,0}, // 9
-                       {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
-                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0}  // MUTE
+                       {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0} // 3
 };
 
 char message[100];
 // Grid of the table
 int board[WIDTH][HEIGHT] = {{0}};
 
+typedef struct BoardConfig
+{
+    int ballX;
+    int ballY;
+    float angle;
+    float velX;
+    float velY;
+    int p1X;
+    int p2X;
+    int p1Y;
+    int p2Y;
+}BoardConfig;
+
+static BoardConfig state = { .ballX = 0, .ballY = 0, .angle = 0, .velX = 0, .velY = 0, .p1X = 0, .p2X = 0, .p1Y = 0, .p2Y = 0};
 typedef struct Pong
 {
     float x;
@@ -278,17 +221,23 @@ int compareTwoSequence(int sequence1[35], int sequence2[35]) {
 char compareBitPatterns() {
     int row;
     int col;
-    for (row = 0; row < 12; row++) {
+    for (row = 0; row < 4; row++) {
         if (compareTwoSequence(bitSequence, buttons[row])) {
-            if (row == 10)
-                return 'D';
-            else if (row == 11)
-                return 'M';
-            else
-                return row + '0';
+            lastRead = row + '0';
+            return row + '0';
         }
     }
-    return 'F';
+    return lastRead;
+}
+
+static char* StateToCommand()
+{
+    // "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+    char h1[48];
+    char* tmp;
+    strcpy(h1, "{\"state\": {\n\r\"desired\" : {\n\r\"ballX\" : ");
+    sprintf(tmp, "%d", state.ballX);
+    strcat(h1, tmp);
 }
 
 static void GPIOA2IntHandler(void)
@@ -342,6 +291,7 @@ void initializeVariables()
     pulseCounter = 0;
     _time = 0;
     readIndex = 0;
+    lastRead = ' ';
     receiverLineNumber = 64;
     memset(buffer, ' ', 64);
     memset(receiverBuffer, ' ', 64);
@@ -386,8 +336,6 @@ void SPI_Init() {
 
     MAP_SPIFIFOEnable(GSPI_BASE, SPI_TX_FIFO || SPI_RX_FIFO);
 
-
-
     // Configure SPI interface
 
     MAP_SPIConfigSetExpClk(GSPI_BASE,MAP_PRCMPeripheralClockGet(PRCM_GSPI),
@@ -403,8 +351,6 @@ void SPI_Init() {
                      SPI_CS_ACTIVELOW |
 
                      SPI_WL_8));
-
-
 
     // Enable SPI for communication
 
@@ -746,7 +692,7 @@ static long ConfigureSimpleLinkToDefaultState() {
         // Wait
         while(IS_CONNECTED(g_ulStatus)) {
 #ifndef SL_PLATFORM_MULTI_THREADED
-              _SlNonOsMainLoopTask(); 
+              _SlNonOsMainLoopTask();
 #endif
         }
     }
@@ -905,6 +851,23 @@ static int set_time() {
     return SUCCESS;
 }
 
+static void ConnectToInternet()
+{
+    long lRetVal = -1;
+    lRetVal = connectToAccessPoint();
+    //Set time so that encryption can be used
+    lRetVal = set_time();
+    if(lRetVal < 0) {
+        UART_PRINT("Unable to set time in the device");
+        LOOP_FOREVER();
+    }
+    //Connect to the website with TLS encryption
+    lRetVal = tls_connect();
+    if(lRetVal < 0) {
+        ERR_PRINT(lRetVal);
+    }
+}
+
 //*****************************************************************************
 //
 //! This function demonstrates how certificate can be used with SSL.
@@ -1029,17 +992,17 @@ int connectToAccessPoint() {
     lRetVal = InitializeAppVariables();
     ASSERT_ON_ERROR(lRetVal);
 
-    //
-    // Following function configure the device to default state by cleaning
-    // the persistent settings stored in NVMEM (viz. connection profiles &
-    // policies, power policy etc)
-    //
-    // Applications may choose to skip this step if the developer is sure
-    // that the device is in its default state at start of applicaton
-    //
-    // Note that all profiles and persistent settings that were done on the
-    // device will be lost
-    //
+    /*
+     * Following function configure the device to default state by cleaning
+     * the persistent settings stored in NVMEM (viz. connection profiles &
+     * policies, power policy etc)
+     * Applications may choose to skip this step if the developer is sure
+     * that the device is in its default state at start of applicaton
+
+     * Note that all profiles and persistent settings that were done on the
+     * device will be lost
+    */
+
     lRetVal = ConfigureSimpleLinkToDefaultState();
     if(lRetVal < 0) {
       if (DEVICE_NOT_IN_STATION_MODE == lRetVal)
@@ -1093,8 +1056,6 @@ static int http_post(int iTLSSockID, char* m){
     strcpy(pcBufHeaders, CHEADER);
     pcBufHeaders += strlen(CHEADER);
     strcpy(pcBufHeaders, "\r\n\r\n");
-
-
     char DATA[100];
     memset(DATA, ' ', 100);
 
@@ -1176,7 +1137,6 @@ static int http_get(int iTLSSockID){
 
     UART_PRINT(acSendBuff);
 
-
     //
     // Send the packet to the server */
     //
@@ -1219,155 +1179,8 @@ void GetMessage()
     {
         MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
         currRead = compareBitPatterns();
-        if (currRead == 'M')
-        {
-            Report("\n\r");
-            printBuffer();
-            buffer[readIndex + 1] = '\0';
-            // http_post(lRetVal, buffer);
-            memset(buffer, ' ', 64);
-            readIndex = 0;
-        }
-        else if (currRead == 'F' && _readTime > 2000)
-        {
-            ;
-        }
-        else if (currRead != 'F' && _readTime > 2000)
-        {
-            char output = ' ';
-            switch (currRead)
-            {
-            case '2':
-                output = 'a';
-                break;
-            case '3':
-                output = 'd';
-                break;
-            case '4':
-                output = 'g';
-                break;
-            case '5':
-                output = 'j';
-                break;
-            case '6':
-                output = 'm';
-                break;
-            case '7':
-                output = 'p';
-                break;
-            case '8':
-                output = 't';
-                break;
-            case '9':
-                output = 'w';
-                break;
-            case '0':
-                output = ' ';
-                break;
-            case 'D':
-                deleteFlag = 1;
-                break;
-            }
-            buffer[readIndex] = output;
-            Report("%c", buffer[readIndex]);
-            if (deleteFlag == 0)
-                readIndex++;
-        }
-        else if (currRead == 'F' && _readTime < 2700)
-        {
-            char output = ' ';
-            switch (buffer[readIndex - 1])
-            {
-            case 'a':
-                output = 'b';
-                break;
-            case 'b':
-                output = 'c';
-                break;
-            case 'c':
-                output = 'a';
-                break;
-            case 'd':
-                output = 'e';
-                break;
-            case 'e':
-                output = 'f';
-                break;
-            case 'f':
-                output = 'd';
-                break;
-            case 'g':
-                output = 'h';
-                break;
-            case 'h':
-                output = 'i';
-                break;
-            case 'i':
-                output = 'g';
-                break;
-            case 'j':
-                output = 'k';
-                break;
-            case 'k':
-                output = 'l';
-                break;
-            case 'l':
-                output = 'j';
-                break;
-            case 'm':
-                output = 'n';
-                break;
-            case 'n':
-                output = 'o';
-                break;
-            case 'o':
-                output = 'm';
-                break;
-            case 'p':
-                output = 'q';
-                break;
-            case 'q':
-                output = 'r';
-                break;
-            case 'r':
-                output = 's';
-                break;
-            case 's':
-                output = 'p';
-                break;
-            case 't':
-                output = 'u';
-                break;
-            case 'u':
-                output = 'v';
-                break;
-            case 'w':
-                output = 'x';
-                break;
-            case 'x':
-                output = 'y';
-                break;
-            case 'y':
-                output = 'z';
-                break;
-            case 'z':
-                output = 'w';
-                break;
-            }
-            buffer[readIndex - 1] = output;
-            Report("%c", buffer[readIndex - 1]);
-        }
-
-        if ((currRead == 'D' || deleteFlag == 1) && readIndex > 0)
-        {
-            // Pressing the delete button
-            Report("D");
-            Report("%d", readIndex);
-            buffer[readIndex] = ' ';
-            readIndex--;
-            deleteFlag = 0;
-        }
         // replace above line with code to print to OLED
+        printf("%s\n", &currRead);
         _readTime = 0;
         interruptCounter = 0;
         initializeArr();
@@ -1422,9 +1235,10 @@ void PedalLogic()
 //! \return None
 //!
 //*****************************************************************************
-  void main() {
+void main()
+{
     unsigned long ulStatus;
-    long lRetVal = -1;
+
     //
     // Initialize board configuration
     //
@@ -1436,21 +1250,9 @@ void PedalLogic()
     ClearTerm();
 
     displayBanner();
-    /*
-    //Connect the CC3200 to the local access point
-    lRetVal = connectToAccessPoint();
-    //Set time so that encryption can be used
-    lRetVal = set_time();
-    if(lRetVal < 0) {
-        UART_PRINT("Unable to set time in the device");
-        LOOP_FOREVER();
-    }
-    //Connect to the website with TLS encryption
-    lRetVal = tls_connect();
-    if(lRetVal < 0) {
-        ERR_PRINT(lRetVal);
-    }
-    */
+
+    // ConnectToInternet();
+
     // SPI config
     SPI_Init();
 
@@ -1482,7 +1284,7 @@ void PedalLogic()
         // logic for matching the pattern and displaying character on OLED
         // 35 RISING HIGH INTERRUPTS
         // GetMessage();
-        // GameLogic();
+        GameLogic();
         PedalLogic();
 
     }
