@@ -1099,17 +1099,20 @@ static int http_post(int iTLSSockID, char* m){
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("POST failed. Error Number: %i\n\r",lRetVal);
-        // http_post(iTLSSockID, m);
-        sl_Close(iTLSSockID);
+        delay(5);
+        return http_post(iTLSSockID, m);
+        // sl_Close(iTLSSockID);
         // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        return lRetVal;
+        // return lRetVal;
     }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
+        delay(5);
+        return http_post(iTLSSockID, m);
         // http_post(iTLSSockID, m);
-        sl_Close(iTLSSockID);
-        return lRetVal;
+        // sl_Close(iTLSSockID);
+        // return lRetVal;
     }
     else {
         acRecvbuff[lRetVal+1] = '\0';
@@ -1147,17 +1150,21 @@ static int http_get(int iTLSSockID){
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("GET failed. Error Number: %i\n\r",lRetVal);
+        delay(5);
+        return http_get(iTLSSockID);
         // http_get(iTLSSockID);
-        sl_Close(iTLSSockID);
-        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        return lRetVal;
+        // sl_Close(iTLSSockID);
+        // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+        // return lRetVal;
     }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
-        sl_Close(iTLSSockID);
-        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        return lRetVal;
+        delay(5);
+        return http_get(iTLSSockID);
+        // sl_Close(iTLSSockID);
+        // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+        // return lRetVal;
         // http_get(iTLSSockID);
     }
     else {
