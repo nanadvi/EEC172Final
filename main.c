@@ -35,7 +35,7 @@
 // draw functions includes
 #include "test.h"
 
-#define SPI_IF_BIT_RATE  1000000
+#define SPI_IF_BIT_RATE  1200000
 #define TR_BUFF_SIZE 100
 // Definitions for Simplelink
 #define MAX_URI_SIZE 128
@@ -144,7 +144,7 @@ int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0} // 3
 };
-int isPlayerOne = 1;
+int isPlayerOne = 0;
 char message[100];
 
 static char json[1024];
@@ -169,7 +169,7 @@ static BoardConfig state = { .ballX = WIDTH/2,
                              .ballY = HEIGHT/2,
                              .angle = 45,
                              .velX = 2,
-                             .velY = 2,
+                             .velY = -2,
                              .p1X = (WIDTH/2)-pedalSize,
                              .p2X = (WIDTH/2)-pedalSize,
                              .p1Y = 0,
@@ -1090,29 +1090,26 @@ static int http_post(int iTLSSockID, char* m){
 
     int testDataLength = strlen(pcBufHeaders);
 
-    // UART_PRINT(acSendBuff);
-
-
     //
     // Send the packet to the server */
     //
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("POST failed. Error Number: %i\n\r",lRetVal);
-        delay(5);
-        return http_post(iTLSSockID, m);
-        // sl_Close(iTLSSockID);
+        // delay(5);
+        // return http_post(iTLSSockID, m);
+        sl_Close(iTLSSockID);
         // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        // return lRetVal;
+        return lRetVal;
     }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
-        delay(5);
-        return http_post(iTLSSockID, m);
+        // delay(5);
+        // return http_post(iTLSSockID, m);
         // http_post(iTLSSockID, m);
-        // sl_Close(iTLSSockID);
-        // return lRetVal;
+        sl_Close(iTLSSockID);
+        return lRetVal;
     }
     else {
         acRecvbuff[lRetVal+1] = '\0';
@@ -1142,30 +1139,22 @@ static int http_get(int iTLSSockID){
     int testDataLength = strlen(pcBufHeaders);
 
     // UART_PRINT(acSendBuff);
-
-
     //
     // Send the packet to the server */
     //
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("GET failed. Error Number: %i\n\r",lRetVal);
-        delay(5);
-        return http_get(iTLSSockID);
-        // http_get(iTLSSockID);
-        // sl_Close(iTLSSockID);
-        // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        // return lRetVal;
+        // delay(5);
+        sl_Close(iTLSSockID);
+        return lRetVal;
     }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
-        delay(5);
-        return http_get(iTLSSockID);
-        // sl_Close(iTLSSockID);
-        // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-        // return lRetVal;
-        // http_get(iTLSSockID);
+        // delay(5);
+        sl_Close(iTLSSockID);
+        return lRetVal;
     }
     else {
         acRecvbuff[lRetVal+1] = '\0';
@@ -1292,6 +1281,7 @@ void displayBanner()
 
 void GetMessage()
 {
+
     // logic for matching the pattern and displaying character on OLED
     // 35 RISING HIGH INTERRUPTS
     if (interruptCounter == 35)
@@ -1335,8 +1325,8 @@ static int isColliding()
     int deltaYp1 = cirY - max(state.p1Y, min(cirY, state.p1Y+pedalWidth));
     retp1 = (deltaXp1 * deltaXp1 + deltaYp1 * deltaYp1) < 25;
     int deltaXp2 = cirX - max(state.p2X, min(cirX, state.p2X+pedalSize));
-    int deltaYp2 = cirY - max(state.p2Y, min(cirY, state.p2Y+pedalWidth));
-    // printf("x: %d, y: %d\n", deltaXp2, deltaYp2);
+    int deltaYp2 = cirY - max(state.p2Y, min(cirY, state.p2Y-pedalWidth));
+    //printf("x: %d, y: %d\n", deltaXp2, deltaYp2);
     retp2 = (deltaXp2 * deltaXp2 + deltaYp2 * deltaYp2) < 25;
     return (retp1 || retp2);
 }
@@ -1398,6 +1388,11 @@ void GameLogic()
     }
     state.ballX += (cos(state.angle) * state.velX);
     state.ballY += (sin(state.angle) * state.velY);
+
+    if(isColliding())
+    {
+        state.velY *= -1;
+    }
     if(state.ballX - 5 < 0 || state.ballX + 5 > WIDTH)
     {
         state.velX *= -1;
@@ -1406,15 +1401,13 @@ void GameLogic()
     {
         state.ballX = 64;
         state.ballY = 64;
+        state.angle = 45;
     }
 
-    if(isColliding())
-    {
-        state.velY *= -1;
-    }
+
 
     // printf("x: %d, y: %d\n", state.ballX, state.ballY);
-    // currRead = ' ';
+    currRead = ' ';
 
 }
 
@@ -1432,6 +1425,8 @@ void main()
     unsigned long ulStatus;
     long lRetVal;
     int snapTime = 0;
+    int updateSnap = 0;
+    int gameUpdate = 0;
     //
     // Initialize board configuration
     //
@@ -1469,40 +1464,58 @@ void main()
     initializeArr();
 
     MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
+    TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
 
     updateJSON();
 
     http_post(lRetVal, json);
 
     // setting timer value to 0
-    TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
-    deleteFlag = 0;
-    // Initialization
-    // http_get(lRetVal);
-    // http_post(lRetVal, DATA1);
     while (1) {
-        GetMessage();
         snapTime++;
+        updateSnap++;
         // logic for matching the pattern and displaying character on OLED
         // 35 RISING HIGH INTERRUPTS
         Draw(1);
-//        if(snapTime == 50)
+        int ret = http_get(lRetVal);
+        readJSON();
+//        if(snapTime == 1)
 //        {
-//            http_get(lRetVal);
+//            int ret = http_get(lRetVal);
+//            while(ret < 0)
+//            {
+//                ret = http_get(lRetVal);
+//                if(ret >= 0)
+//                    break;
+//            }
 //            readJSON();
-//            delay(2);
-//            Draw(0);
-//        }
-        delay(2);
-        GameLogic();
-        Draw(0);
-        delay(2);
-//        if(snapTime == 50)
-//        {
-//            updateJSON();
-//            http_post(lRetVal, json);
 //            snapTime = 0;
 //        }
+
+        // delay(1);
+        GetMessage();
+        GameLogic();
+        Draw(0);
+        updateJSON();
+        http_post(lRetVal, json);
+
+//        if(updateSnap == 1)
+//        {
+//            updateJSON();
+//            // MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
+//            int ret = http_post(lRetVal, json);
+//            while(ret < 0)
+//            {
+//                // updateJSON();
+//                // delay(2);
+//                ret = http_post(lRetVal, json);
+//                if(ret >= 0)
+//                    break;
+//            }
+//            Draw(1);
+//            updateSnap = 0;
+//        }
+
 
     }
     sl_Stop(SL_STOP_TIMEOUT);
