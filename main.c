@@ -35,7 +35,7 @@
 // draw functions includes
 #include "test.h"
 
-#define SPI_IF_BIT_RATE  100000
+#define SPI_IF_BIT_RATE  1200000
 #define TR_BUFF_SIZE 100
 // Definitions for Simplelink
 #define MAX_URI_SIZE 128
@@ -65,6 +65,9 @@
 #define CTHEADER "Content-Type: application/json; charset=utf-8\r\n"
 #define CLHEADER1 "Content-Length: "
 #define CLHEADER2 "\r\n\r\n"
+
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
 
 #define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
 
@@ -130,15 +133,15 @@ unsigned long timeOfInterrupt[35] = {};
 unsigned int bitSequence[35] = {};
 int receiverLineNumber;
 int readIndex;
-int pedalSize = 20;
-int pedalWidth = 5;
+const int pedalSize = 20;
+const int pedalWidth = 5;
 int buttons[12][35] = {
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
                        {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0} // 3
 };
-
+int isPlayerOne = 1;
 char message[100];
 // Grid of the table
 int board[WIDTH][HEIGHT] = {{0}};
@@ -156,7 +159,15 @@ typedef struct BoardConfig
     int p2Y;
 }BoardConfig;
 
-static BoardConfig state = { .ballX = 0, .ballY = 0, .angle = 0, .velX = 0, .velY = 0, .p1X = 0, .p2X = 0, .p1Y = 0, .p2Y = 0};
+static BoardConfig state = { .ballX = WIDTH/2,
+                             .ballY = HEIGHT/2,
+                             .angle = 45,
+                             .velX = 2,
+                             .velY = 2,
+                             .p1X = (WIDTH/2)-pedalSize,
+                             .p2X = (WIDTH/2)-pedalSize,
+                             .p1Y = 0,
+                             .p2Y = HEIGHT-pedalWidth};
 typedef struct Pong
 {
     float x;
@@ -292,6 +303,7 @@ void initializeVariables()
     _time = 0;
     readIndex = 0;
     lastRead = ' ';
+    currRead = ' ';
     receiverLineNumber = 64;
     memset(buffer, ' ', 64);
     memset(receiverBuffer, ' ', 64);
@@ -851,7 +863,7 @@ static int set_time() {
     return SUCCESS;
 }
 
-static void ConnectToInternet()
+static long ConnectToInternet()
 {
     long lRetVal = -1;
     lRetVal = connectToAccessPoint();
@@ -866,6 +878,7 @@ static void ConnectToInternet()
     if(lRetVal < 0) {
         ERR_PRINT(lRetVal);
     }
+    return lRetVal;
 }
 
 //*****************************************************************************
@@ -1180,7 +1193,7 @@ void GetMessage()
         MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
         currRead = compareBitPatterns();
         // replace above line with code to print to OLED
-        printf("%s\n", &currRead);
+        // printf("%s\n", &currRead);
         _readTime = 0;
         interruptCounter = 0;
         initializeArr();
@@ -1189,43 +1202,116 @@ void GetMessage()
     }
 }
 
+void Draw(int e)
+{
+    // Erase
+    if(e)
+    {
+        fillCircle(state.ballX, state.ballY, 5, BLACK);
+        fillRect(state.p1X, state.p1Y, pedalSize, pedalWidth, BLACK);
+        fillRect(state.p2X, state.p2Y, pedalSize, pedalWidth, BLACK);
+    }
+    else
+    {
+        fillCircle(state.ballX, state.ballY, 5, RED);
+        fillRect(state.p1X, state.p1Y, pedalSize, pedalWidth, BLUE);
+        fillRect(state.p2X, state.p2Y, pedalSize, pedalWidth, GREEN);
+    }
+
+}
+
+static int isColliding()
+{
+    int retp1, retp2;
+    int cirX = state.ballX;
+    int cirY = state.ballY;
+    int deltaXp1 = cirX - max(state.p1X, min(cirX, state.p1X+pedalSize));
+    int deltaYp1 = cirY - max(state.p1Y, min(cirY, state.p1Y+pedalWidth));
+    retp1 = (deltaXp1 * deltaXp1 + deltaYp1 * deltaYp1) < 25;
+    int deltaXp2 = cirX - max(state.p2X, min(cirX, state.p2X+pedalSize));
+    int deltaYp2 = cirY - max(state.p2Y, min(cirY, state.p2Y+pedalWidth));
+    // printf("x: %d, y: %d\n", deltaXp2, deltaYp2);
+    retp2 = (deltaXp2 * deltaXp2 + deltaYp2 * deltaYp2) < 25;
+    return (retp1 || retp2);
+}
+
 void GameLogic()
 {
-    // Basic Draw the PONG
-    float currX = pong.x, currY = pong.y;
-    fillCircle(currX, currY, pong.r, BLACK);
+    switch(isPlayerOne)
+    {
+        case 0:
+            if(currRead == '1' && (state.p1X-8) > 0)
+            {
+                state.p1X -= 6;
+            }
+            else if(currRead == '3' && (state.p1X+8) < 128)
+            {
+                state.p1X += 6;
+            }
+            else
+            {
+            }
+            if(state.p1X > 128)
+            {
+                state.p1X = 128-pedalSize;
+                currRead = ' ';
+            }
+            if (state.p1X < 0)
+            {
+                state.p1X = pedalSize;
+                currRead = ' ';
+            }
 
-    if((pong.x - pong.r) < 0)
-    {
-        pong.velocityX *= -1;
-        pong.x = pong.r;
+            break;
+        case 1:
+            if(currRead == '1')
+            {
+                state.p2X -= 6;
+                // currRead = ' ';
+            }
+            else if(currRead == '3')
+            {
+                state.p2X += 6;
+                // currRead = ' ';
+                // printf("%d\n", &state.p2X);
+            }
+            else
+            {
+            }
+            if(state.p2X > 128)
+            {
+                state.p2X = 128-pedalSize;
+                currRead = ' ';
+            }
+            if (state.p2X < 0)
+            {
+                state.p2X = 0;
+                currRead = ' ';
+            }
+            break;
     }
-    else if( pong.x + pong.r > WIDTH)
+    state.ballX += (cos(state.angle) * state.velX);
+    state.ballY += (sin(state.angle) * state.velY);
+    if(state.ballX - 5 < 0 || state.ballX + 5 > WIDTH)
     {
-        pong.velocityX *= -1;
-        pong.x = WIDTH - pong.r;
+        state.velX *= -1;
     }
-    if((pong.y - pong.r) < 0)
+    if(state.ballY - 5 < 0 || state.ballY + 5 > HEIGHT)
     {
-        pong.velocityY *= -1;
-        pong.x = pong.r;
+        state.ballX = 64;
+        state.ballY = 64;
     }
-    else if( pong.y + pong.r > HEIGHT)
+
+    if(isColliding())
     {
-        pong.velocityY *= -1;
-        pong.x = HEIGHT - pong.r;
+        state.velY *= -1;
     }
-    pong.x += (cos(pong.angle) * pong.velocityX);
-    pong.y += (sin(pong.angle) * pong.velocityY);
-    fillCircle(pong.x, pong.y, pong.r, BLUE);
+
+    // printf("x: %d, y: %d\n", state.ballX, state.ballY);
+    // currRead = ' ';
+
 }
 
-void PedalLogic()
-{
-    fillRect(player1.position-pedalSize, 0, pedalSize, 5, GREEN);
-    fillRect(player2.position-pedalSize, HEIGHT-pedalWidth, pedalSize, pedalWidth, BLUE);
-
-}
 //*****************************************************************************
 //
 //! Main
@@ -1238,6 +1324,7 @@ void PedalLogic()
 void main()
 {
     unsigned long ulStatus;
+    long lRetVal;
 
     //
     // Initialize board configuration
@@ -1251,7 +1338,7 @@ void main()
 
     displayBanner();
 
-    // ConnectToInternet();
+    // lRetVal = ConnectToInternet();
 
     // SPI config
     SPI_Init();
@@ -1280,13 +1367,19 @@ void main()
     // setting timer value to 0
     TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
     deleteFlag = 0;
+    // Initialization
+    fillRect(player1.position - pedalSize, 0, pedalSize, 5, GREEN);
+    // http_get(lRetVal);
+    // http_post(lRetVal, DATA1);
     while (1) {
         // logic for matching the pattern and displaying character on OLED
         // 35 RISING HIGH INTERRUPTS
-        // GetMessage();
+        GetMessage();
+        Draw(1);
+        delay(2);
         GameLogic();
-        PedalLogic();
-
+        Draw(0);
+        delay(2);
     }
     sl_Stop(SL_STOP_TIMEOUT);
 }
