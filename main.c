@@ -110,11 +110,11 @@
 #define SL_SSL_CLIENT  "/cert/client.der"
 
 //NEED TO UPDATE THIS FOR IT TO WORK!
-#define DATE                1    /* Current Date */
+#define DATE                15    /* Current Date */
 #define MONTH               3     /* Month 1-12 */
 #define YEAR                2018  /* Current year */
-#define HOUR                10    /* Time - hours */
-#define MINUTE              19    /* Time - minutes */
+#define HOUR                23    /* Time - hours */
+#define MINUTE              25    /* Time - minutes */
 #define SECOND              0     /* Time - seconds */
 
 #define POSTHEADER "POST /things/sailesh_cc3200Board/shadow HTTP/1.1\r\n"
@@ -124,6 +124,9 @@
 #define CTHEADER "Content-Type: application/json; charset=utf-8\r\n"
 #define CLHEADER1 "Content-Length: "
 #define CLHEADER2 "\r\n\r\n"
+
+#define BEGIN_JSON_STRING "{\"state\": {\n\r\"desired\" : {"
+#define END_JSON_STRING "}}}\r\n\r\n"
 
 #define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
 
@@ -183,17 +186,8 @@ int interruptCounter;
 unsigned long _time;
 unsigned int bitSequence[35] = {};
 int buttons[12][35] = {
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,0}, // 0
   {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0}, // 1
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0}, // 2
   {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0}, // 3
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,1,0}, // 4
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,1,0,0,0,0,0,0,1,0,1,1,1,1,1,0}, // 5
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,1,1,0}, // 6
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,1,0,0,0,0,1,1,1,0,1,1,1,1,0}, // 7
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,1,1,1,0}, // 8
-  {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,0,1,1,1,1,0}, // 9
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // DELETE
   {0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0} // MUTE
 };
 char currRead;
@@ -202,20 +196,40 @@ char currRead;
 int board[128][128] = {{0}};
 
 typedef struct {
-    float x;
-    float y;
-    float angle;
-    float velocity;
-}Pong;
+    int ballX;
+    int ballY;
+    int angle;
+    int velX;
+    int velY;
+    int p1X;
+    int p2X;
+} BoardConfig;
 
 typedef struct {
-    float y;
-    float width;
-    float height;
+    int x;
+    int y;
+    int angle;
+    int velX;
+    int velY;
+}Ball;
+
+typedef struct {
+    int x;
+    int width;
+    int height;
 }Paddle;
 
-static Paddle paddle1 = {.y = 64, .width = 3, .height = 7};
-static Paddle paddle2 = {.y = 64, .width = 3, .height = 7};
+// initialize ball struct to 0
+static Ball ball = {.x = 0, .y = 0, .angle = 0, .velX = 0, .velY = 0};
+
+// initialize paddle struct to 0
+static Paddle paddle = {.x = 0, .width = 0, .height = 0};
+
+// initialize board config to 0
+static BoardConfig state = { .ballX = 0, .ballY = 0, .angle = 0, .velX = 0, .velY = 0, .p1X = 0, .p2X = 0};
+
+static char json[1024];
+char recvJSON[1460];
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
 //*****************************************************************************
@@ -259,14 +273,17 @@ int compareTwoSequence(int sequence1[35], int sequence2[35]) {
 char compareBitPatterns() {
     int row;
     int col;
-    for (row = 0; row < 12; row++) {
+    for (row = 0; row < 3; row++) {
         if (compareTwoSequence(bitSequence, buttons[row])) {
-            if (row == 10)
-                return 'D';
-            else if (row == 11)
+            if (row == 0) {
+                return 1 + '0';
+            }
+            else if (row == 1) {
+                return 3 + '0';
+            }
+            else if (row == 2) {
                 return 'M';
-            else
-                return row + '0';
+            }
         }
     }
     return 'F';
@@ -1032,6 +1049,8 @@ int connectToAccessPoint() {
     return 0;
 }
 
+
+
 static int http_post(int iTLSSockID, char* m){
     char acSendBuff[512];
     char acRecvbuff[1460];
@@ -1048,19 +1067,19 @@ static int http_post(int iTLSSockID, char* m){
     pcBufHeaders += strlen(CHEADER);
     strcpy(pcBufHeaders, "\r\n\r\n");
 
-
-    char DATA[100];
-    memset(DATA, ' ', 100);
+//    char DATA[100];
+//    memset(DATA, ' ', 100);
 
     int msgLength = (int)strlen(m);
-    strcpy(DATA, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
-    strncat(DATA, m, msgLength);
-    strcat(DATA, "\"\r\n}}}\r\n\r\n");
+//    strcpy(DATA, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
+//    strncat(DATA, m, msgLength);
+//    strcat(DATA, "\"\r\n}}}\r\n\r\n");
 
-    msgLength = strlen(DATA);
-    DATA[msgLength+1] = '\0';
+//    strcpy(DATA, message);
+    msgLength = strlen(m);
+    m[msgLength+1] = '\0';
 
-    int dataLength = strlen(DATA);
+    int dataLength = strlen(m);
 
 
     strcpy(pcBufHeaders, CTHEADER);
@@ -1075,8 +1094,8 @@ static int http_post(int iTLSSockID, char* m){
     strcpy(pcBufHeaders, CLHEADER2);
     pcBufHeaders += strlen(CLHEADER2);
 
-    strcpy(pcBufHeaders, DATA);
-    pcBufHeaders += strlen(DATA);
+    strcpy(pcBufHeaders, m);
+    pcBufHeaders += strlen(m);
 
     int testDataLength = strlen(pcBufHeaders);
 
@@ -1150,6 +1169,7 @@ static int http_get(int iTLSSockID){
     else {
         acRecvbuff[lRetVal+1] = '\0';
         UART_PRINT(acRecvbuff);
+        strcpy(recvJSON, acRecvbuff);
         UART_PRINT("\n\r\n\r");
     }
 
@@ -1170,6 +1190,123 @@ void GetMessage()
         initializeArr();
         MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
         TimerEnable(TIMERA0_BASE, TIMER_A);
+}
+
+void initializeState() {
+    // default initial values for ball
+    state.ballX = WIDTH/2;
+    state.ballY = HEIGHT/2;
+    state.angle = 4.5;
+    state.velX = 1;
+    state.velY = 3;
+    state.p1X = WIDTH/2 - 15;
+    state.p2X = WIDTH/2 - 15;
+}
+
+
+void updateJSON() {
+    // "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+    char tmp[48];
+
+    strcpy(json, BEGIN_JSON_STRING);
+
+    strcat(json, "\n\r\"ballX\": ");
+    sprintf(tmp, "\"%03d\"", state.ballX);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"ballY\": ");
+    sprintf(tmp, "\"%03d\"", state.ballY);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"angle\": ");
+    sprintf(tmp, "\"%02d\"", state.angle);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"velX\": ");
+    sprintf(tmp, "\"%1d\"", state.velX);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"velY\": ");
+    sprintf(tmp, "\"%1d\"", state.velY);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"p1X\": ");
+    sprintf(tmp, "\"%03d\"", state.p1X);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"p2X\": ");
+    sprintf(tmp, "\"%03d\"", state.p2X);
+    // strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, END_JSON_STRING);
+
+}
+
+void readJSON() {
+    char tmp1;
+    char tmp2[2];
+    char tmp3[3];
+    // update state ballX value
+
+    tmp3[0] = recvJSON[239];
+    tmp3[1] = recvJSON[240];
+    tmp3[2] = recvJSON[241];
+
+    int ballX = atoi(tmp3);
+    state.ballX = ballX;
+
+    // update ballY value
+    tmp3[0] = recvJSON[253];
+    tmp3[1] = recvJSON[254];
+    tmp3[2] = recvJSON[255];
+
+    int ballX = atoi(tmp3);
+    state.ballY = ballY;
+
+    // update angle value
+    tmp2[0] = recvJSON[267];
+    tmp2[1] = recvJSON[268];
+
+    int angle = atoi(tmp2);
+    state.angle = angle;
+
+    // update velX value
+    tmp = recvJSON[279];
+
+    int velX = atoi(tmp);
+    if (velX == 1)
+        state.velX *= -1;
+
+    // update velY value
+    tmp = recvJSON[290];
+
+    int velY = atoi(tmp);
+    if (velY == 1)
+        state.velY *= -1;
+
+    // update p1X value
+    tmp3[0] = recvJSON[300];
+    tmp3[1] = recvJSON[301];
+    tmp3[2] = recvJSON[302];
+
+    int p1X = atoi(tmp3);
+    state.p1X = p1X;
+
+    // update p2X value
+    tmp3[0] = recvJSON[312];
+    tmp3[1] = recvJSON[313];
+    tmp3[2] = recvJSON[314];
+
+    int p2X = atoi(tmp3);
+    state.p2X = p2X;
+
 }
 
 //*****************************************************************************
@@ -1244,6 +1381,9 @@ void main() {
     // Initialize all the global variables
     initializeVariables();
     initializeArr();
+    initializeState();
+
+    updateJSON();
 
     MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
 
@@ -1252,17 +1392,30 @@ void main() {
 
     // TODO: display starting state of board
 
+    http_post(lRetVal, json);
+
+    http_get(lRetVal);
+
     while (1) {
+
+        http_get(lRetVal);
+
+        readJSON();
+
         if (interruptCounter == 35) {
             MAP_GPIOIntDisable(gpioin.port, gpioin.pin);
+
             currRead = compareBitPatterns();
 
+            Report("%c\n\r", currRead);
+
             // TODO: moving the paddle up
-            if (currRead == '2') {
+            if (currRead == '1') {
+                state.ballX = state.ballX + 3;
 
             }
             // TODO: moving the paddle down
-            else if (currRead == '8') {
+            else if (currRead == '3') {
 
             }
 
@@ -1270,7 +1423,13 @@ void main() {
             initializeArr();
             MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
             TimerEnable(TIMERA0_BASE, TIMER_A);
+
+            updateJSON();
+
+            http_post(lRetVal, json);
         }
+
+
 
     }
     sl_Stop(SL_STOP_TIMEOUT);
