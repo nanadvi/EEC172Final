@@ -35,7 +35,7 @@
 // draw functions includes
 #include "test.h"
 
-#define SPI_IF_BIT_RATE  1200000
+#define SPI_IF_BIT_RATE  1000000
 #define TR_BUFF_SIZE 100
 // Definitions for Simplelink
 #define MAX_URI_SIZE 128
@@ -70,6 +70,9 @@
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 #define DATA1 "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+
+#define BEGIN_JSON_STRING "{\"state\": {\n\r\"desired\" : {"
+#define END_JSON_STRING "}}}\r\n\r\n"
 
 // Application specific status/error codes
 typedef enum{
@@ -143,6 +146,9 @@ int buttons[12][35] = {
 };
 int isPlayerOne = 1;
 char message[100];
+
+static char json[1024];
+char recvJSON[1460];
 // Grid of the table
 int board[WIDTH][HEIGHT] = {{0}};
 
@@ -150,9 +156,9 @@ typedef struct BoardConfig
 {
     int ballX;
     int ballY;
-    float angle;
-    float velX;
-    float velY;
+    int angle;
+    int velX;
+    int velY;
     int p1X;
     int p2X;
     int p1Y;
@@ -168,25 +174,7 @@ static BoardConfig state = { .ballX = WIDTH/2,
                              .p2X = (WIDTH/2)-pedalSize,
                              .p1Y = 0,
                              .p2Y = HEIGHT-pedalWidth};
-typedef struct Pong
-{
-    float x;
-    float y;
-    float r;
-    double angle;
-    double velocityX;
-    double velocityY;
-}Pong;
-
-typedef struct Pedal
-{
-    float position;
-    int health;
-}Pedal;
 // Ball starts from the middle of the board
-static Pong pong = { .x = WIDTH/2, .y = HEIGHT/2, .r = 5, .angle = 45, .velocityX = 2 , .velocityY = 2};
-static Pedal player1 = { .position = WIDTH/2, .health = 3 };
-static Pedal player2 = { .position = WIDTH/2, .health = 3 };
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
@@ -1069,19 +1057,20 @@ static int http_post(int iTLSSockID, char* m){
     strcpy(pcBufHeaders, CHEADER);
     pcBufHeaders += strlen(CHEADER);
     strcpy(pcBufHeaders, "\r\n\r\n");
-    char DATA[100];
-    memset(DATA, ' ', 100);
+
+//    char DATA[100];
+//    memset(DATA, ' ', 100);
 
     int msgLength = (int)strlen(m);
-    strcpy(message, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
-    strncat(message, m, msgLength);
-    strcat(message, "\"\r\n}}}\r\n\r\n");
+//    strcpy(DATA, "{\"state\": {\n\r\"player:\" : {\n\r\"message\" : \"");
+//    strncat(DATA, m, msgLength);
+//    strcat(DATA, "\"\r\n}}}\r\n\r\n");
 
-    strcpy(DATA, message);
-    msgLength = strlen(message);
-    DATA[msgLength+1] = '\0';
+//    strcpy(DATA, message);
+    msgLength = strlen(m);
+    m[msgLength+1] = '\0';
 
-    int dataLength = strlen(DATA);
+    int dataLength = strlen(m);
 
 
     strcpy(pcBufHeaders, CTHEADER);
@@ -1096,12 +1085,12 @@ static int http_post(int iTLSSockID, char* m){
     strcpy(pcBufHeaders, CLHEADER2);
     pcBufHeaders += strlen(CLHEADER2);
 
-    strcpy(pcBufHeaders, DATA);
-    pcBufHeaders += strlen(DATA);
+    strcpy(pcBufHeaders, m);
+    pcBufHeaders += strlen(m);
 
     int testDataLength = strlen(pcBufHeaders);
 
-    UART_PRINT(acSendBuff);
+    // UART_PRINT(acSendBuff);
 
 
     //
@@ -1110,21 +1099,22 @@ static int http_post(int iTLSSockID, char* m){
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("POST failed. Error Number: %i\n\r",lRetVal);
+        // http_post(iTLSSockID, m);
         sl_Close(iTLSSockID);
-        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+        // GPIO_IF_LedOn(MCU_RED_LED_GPIO);
         return lRetVal;
     }
     lRetVal = sl_Recv(iTLSSockID, &acRecvbuff[0], sizeof(acRecvbuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
-        //sl_Close(iSSLSockID);
-        GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-           return lRetVal;
+        // http_post(iTLSSockID, m);
+        sl_Close(iTLSSockID);
+        return lRetVal;
     }
     else {
         acRecvbuff[lRetVal+1] = '\0';
-        UART_PRINT(acRecvbuff);
-        UART_PRINT("\n\r\n\r");
+        // UART_PRINT(acRecvbuff);
+        // UART_PRINT("\n\r\n\r");
     }
 
     return 0;
@@ -1148,7 +1138,8 @@ static int http_get(int iTLSSockID){
 
     int testDataLength = strlen(pcBufHeaders);
 
-    UART_PRINT(acSendBuff);
+    // UART_PRINT(acSendBuff);
+
 
     //
     // Send the packet to the server */
@@ -1156,6 +1147,7 @@ static int http_get(int iTLSSockID){
     lRetVal = sl_Send(iTLSSockID, acSendBuff, strlen(acSendBuff), 0);
     if(lRetVal < 0) {
         UART_PRINT("GET failed. Error Number: %i\n\r",lRetVal);
+        // http_get(iTLSSockID);
         sl_Close(iTLSSockID);
         GPIO_IF_LedOn(MCU_RED_LED_GPIO);
         return lRetVal;
@@ -1165,15 +1157,122 @@ static int http_get(int iTLSSockID){
         UART_PRINT("Received failed. Error Number: %i\n\r",lRetVal);
         sl_Close(iTLSSockID);
         GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-           return lRetVal;
+        return lRetVal;
+        // http_get(iTLSSockID);
     }
     else {
         acRecvbuff[lRetVal+1] = '\0';
-        UART_PRINT(acRecvbuff);
-        UART_PRINT("\n\r\n\r");
+        // UART_PRINT(acRecvbuff);
+        strcpy(recvJSON, acRecvbuff);
+        // UART_PRINT("\n\r\n\r");
     }
 
     return 0;
+}
+
+void updateJSON() {
+    // "{\"state\": {\n\r\"desired\" : {\n\r\"color\" : \"green\"\r\n}}}\r\n\r\n"
+    char tmp[48];
+
+    strcpy(json, BEGIN_JSON_STRING);
+
+    strcat(json, "\n\r\"ballX\": ");
+    sprintf(tmp, "\"%03d\"", state.ballX);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"ballY\": ");
+    sprintf(tmp, "\"%03d\"", state.ballY);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"angle\": ");
+    sprintf(tmp, "\"%02d\"", state.angle);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"velX\": ");
+    sprintf(tmp, "\"%1d\"", state.velX);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"velY\": ");
+    sprintf(tmp, "\"%1d\"", state.velY);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"p1X\": ");
+    sprintf(tmp, "\"%03d\"", state.p1X);
+    strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, "\n\r\"p2X\": ");
+    sprintf(tmp, "\"%03d\"", state.p2X);
+    // strcat(tmp, ",");
+    strcat(json, tmp);
+
+    strcat(json, END_JSON_STRING);
+
+}
+
+void readJSON() {
+    char tmp1;
+    char tmp2[2];
+    char tmp3[3];
+    // update state ballX value
+
+    tmp3[0] = recvJSON[239];
+    tmp3[1] = recvJSON[240];
+    tmp3[2] = recvJSON[241];
+
+    int ballX = atoi(tmp3);
+    state.ballX = ballX;
+
+    // update ballY value
+    tmp3[0] = recvJSON[253];
+    tmp3[1] = recvJSON[254];
+    tmp3[2] = recvJSON[255];
+
+    int ballY = atoi(tmp3);
+    state.ballY = ballY;
+
+    // update angle value
+    tmp2[0] = recvJSON[267];
+    tmp2[1] = recvJSON[268];
+
+    int angle = atoi(tmp2);
+    state.angle = angle;
+
+    // update velX value
+    tmp1 = recvJSON[279];
+
+    int velX = atoi(tmp1);
+    if (velX == 1)
+        state.velX *= -1;
+
+    // update velY value
+    tmp1 = recvJSON[290];
+
+    int velY = atoi(tmp1);
+    if (velY == 1)
+        state.velY *= -1;
+
+    // update p1X value
+    tmp3[0] = recvJSON[300];
+    tmp3[1] = recvJSON[301];
+    tmp3[2] = recvJSON[302];
+
+    int p1X = atoi(tmp3);
+    state.p1X = p1X;
+
+    // update p2X value
+    tmp3[0] = recvJSON[312];
+    tmp3[1] = recvJSON[313];
+    tmp3[2] = recvJSON[314];
+
+    int p2X = atoi(tmp3);
+    state.p2X = p2X;
+
 }
 
 void displayBanner()
@@ -1325,7 +1424,7 @@ void main()
 {
     unsigned long ulStatus;
     long lRetVal;
-
+    int snapTime = 0;
     //
     // Initialize board configuration
     //
@@ -1338,7 +1437,7 @@ void main()
 
     displayBanner();
 
-    // lRetVal = ConnectToInternet();
+    lRetVal = ConnectToInternet();
 
     // SPI config
     SPI_Init();
@@ -1364,22 +1463,40 @@ void main()
 
     MAP_GPIOIntEnable(gpioin.port, gpioin.pin);
 
+    updateJSON();
+
+    http_post(lRetVal, json);
+
     // setting timer value to 0
     TimerValueSet(TIMERA0_BASE, TIMER_A, 0);
     deleteFlag = 0;
     // Initialization
-    fillRect(player1.position - pedalSize, 0, pedalSize, 5, GREEN);
     // http_get(lRetVal);
     // http_post(lRetVal, DATA1);
     while (1) {
+        GetMessage();
+        snapTime++;
         // logic for matching the pattern and displaying character on OLED
         // 35 RISING HIGH INTERRUPTS
-        GetMessage();
         Draw(1);
+//        if(snapTime == 50)
+//        {
+//            http_get(lRetVal);
+//            readJSON();
+//            delay(2);
+//            Draw(0);
+//        }
         delay(2);
         GameLogic();
         Draw(0);
         delay(2);
+//        if(snapTime == 50)
+//        {
+//            updateJSON();
+//            http_post(lRetVal, json);
+//            snapTime = 0;
+//        }
+
     }
     sl_Stop(SL_STOP_TIMEOUT);
 }
